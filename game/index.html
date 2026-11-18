@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ffb400'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' font-family='sans-serif' font-weight='bold' fill='%23111'%3ES%3C/text%3E%3C/svg%3E">
+<title>SOLMAR CITY — Open World Crime Game</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0e14; font-family: 'Segoe UI', Arial, sans-serif; color: #fff; }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; }
+  .panel { background: rgba(8, 10, 16, 0.62); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; backdrop-filter: blur(2px); }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 5; }
+  #hud.on { display: block; }
+  #stats { position: absolute; top: 14px; left: 14px; padding: 10px 12px; min-width: 230px; }
+  #stats .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 14px; font-weight: 600; }
+  .bar { flex: 1; height: 10px; background: rgba(255,255,255,0.18); border-radius: 5px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 5px; }
+  #healthFill { background: linear-gradient(90deg, #37d67a, #7CFC00); width: 100%; }
+  #armorFill { background: linear-gradient(90deg, #4aa8ff, #9fd4ff); width: 0%; }
+  #cash { color: #7CFC00; font-size: 18px; }
+  #ammo { color: #ffd23e; }
+  #wanted { position: absolute; top: 14px; right: 16px; font-size: 30px; letter-spacing: 4px; color: #3a3f4a; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+  #wanted .lit { color: #ffd23e; }
+  #wanted .hot { color: #ff3b30; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 9px 16px; text-align: center; max-width: 46vw; }
+  #objective .t { font-size: 13px; letter-spacing: 2px; color: #ffd23e; font-weight: 700; }
+  #objective .d { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  #minimapWrap { position: absolute; left: 14px; bottom: 14px; padding: 6px; }
+  #minimap { display: block; border-radius: 4px; }
+  #speedo { position: absolute; right: 16px; bottom: 14px; padding: 8px 14px; text-align: right; font-weight: 800; }
+  #speedo .n { font-size: 34px; line-height: 1; }
+  #speedo .u { font-size: 12px; color: #cfd6e4; letter-spacing: 2px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; display: none; }
+  #crosshair:before, #crosshair:after { content: ''; position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 4px #000; }
+  #crosshair:before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair:after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #banner { position: absolute; left: 50%; top: 26%; transform: translateX(-50%); text-align: center; font-size: 34px; font-weight: 900; letter-spacing: 1px; color: #fff; text-shadow: 0 3px 0 #000, 0 0 24px rgba(0,0,0,0.8); opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+  #banner small { display: block; font-size: 16px; font-weight: 600; color: #ffd23e; margin-top: 4px; letter-spacing: 2px; }
+  #toast { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); padding: 7px 14px; font-size: 15px; font-weight: 600; opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,0.55) 100%); }
+  #clock { position: absolute; right: 16px; top: 64px; padding: 5px 10px; font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; background: linear-gradient(160deg, rgba(10,14,24,0.88), rgba(30,16,40,0.82)); }
+  .screen.hidden { display: none; }
+  .card { max-width: 640px; width: 92vw; padding: 28px 32px; text-align: center; background: rgba(10, 12, 20, 0.82); border: 1px solid rgba(255, 180, 0, 0.35); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .card h1 { margin: 0 0 4px; font-size: 52px; letter-spacing: 3px; font-weight: 900; color: #ffb400; text-shadow: 0 4px 0 #7a2e00, 0 8px 24px rgba(0,0,0,0.7); font-family: 'Arial Black', Arial, sans-serif; }
+  .card h2 { margin: 0 0 10px; font-size: 15px; letter-spacing: 6px; color: #9fd4ff; font-weight: 700; }
+  .card p { font-size: 15px; line-height: 1.55; color: #dfe6f2; margin: 10px 0; }
+  .card .story { font-style: italic; color: #ffe9a8; }
+  .btn { pointer-events: auto; cursor: pointer; display: inline-block; margin: 8px 6px 0; padding: 12px 26px; font-size: 17px; font-weight: 800; letter-spacing: 1px; color: #111; background: linear-gradient(180deg, #ffd23e, #ff9d00); border: none; border-radius: 8px; box-shadow: 0 4px 0 #8a5200; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a5200; }
+  .btn.ghost { background: rgba(255,255,255,0.12); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.25); }
+  .keys { text-align: left; font-size: 13.5px; line-height: 1.8; color: #c9d3e6; margin: 12px auto 4px; display: inline-block; }
+  .keys b { color: #ffd23e; display: inline-block; min-width: 92px; }
+  #status { position: fixed; left: -9999px; top: 0; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; background: #0b0e14; color: #ffb400; font-size: 18px; font-weight: 700; letter-spacing: 2px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">LOADING SOLMAR CITY…</div>
+<div id="vignette"></div>
+<div id="hud">
+  <div id="stats" class="panel">
+    <div class="row"><span style="width:52px">HEALTH</span><div class="bar"><div id="healthFill"></div></div><span id="healthNum">100</span></div>
+    <div class="row"><span style="width:52px">ARMOR</span><div class="bar"><div id="armorFill"></div></div><span id="armorNum">0</span></div>
+    <div class="row"><span id="cash">$0</span><span style="flex:1"></span><span id="ammo">PISTOL 12 / ∞</span></div>
+  </div>
+  <div id="wanted">★★★★★</div>
+  <div id="clock" class="panel">08:00</div>
+  <div id="objective" class="panel"><div class="t">FREE ROAM</div><div class="d">Explore Solmar City. Steal a car, take a mission, stay out of trouble.</div></div>
+  <div id="minimapWrap" class="panel"><canvas id="minimap" width="190" height="190"></canvas></div>
+  <div id="speedo" class="panel" style="display:none"><div class="n">0</div><div class="u">KM/H</div></div>
+  <div id="crosshair"></div>
+  <div id="banner"></div>
+  <div id="toast" class="panel"></div>
+</div>
+
+<div id="titleScreen" class="screen">
+  <div class="card">
+    <h1>SOLMAR CITY</h1>
+    <h2>AN OPEN-WORLD CRIME STORY</h2>
+    <p class="story">Danny Cole came home to Solmar City with nothing but a busted sedan and a debt to Mama Rosa. The Vipers run the docks, the cops run the streets — and tonight, Danny runs both.</p>
+    <p>Explore a living city on foot and by car. Steal cars, dodge the law, run jobs for Rosa, and take the docks back from the Vipers.</p>
+    <div class="keys">
+      <div><b>W A S D</b> move / drive &nbsp;·&nbsp; <b>Mouse</b> look (click to lock)</div>
+      <div><b>E</b> enter / exit car &nbsp;·&nbsp; <b>Space</b> jump / handbrake</div>
+      <div><b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>Shift</b> sprint</div>
+      <div><b>M</b> music &nbsp;·&nbsp; <b>P / Esc</b> pause &nbsp;·&nbsp; <b>H</b> help</div>
+    </div>
+    <br>
+    <button class="btn" id="btnStart">START STORY</button>
+    <button class="btn ghost" id="btnContinue" style="display:none">CONTINUE</button>
+    <button class="btn ghost" id="btnFree">FREE ROAM</button>
+    <p style="font-size:12px;color:#8b96ab">100% original. No Rockstar / GTA content. Best in desktop Chrome, keyboard + mouse.</p>
+  </div>
+</div>
+
+<div id="pauseScreen" class="screen hidden">
+  <div class="card">
+    <h1 style="font-size:38px">PAUSED</h1>
+    <p>Solmar City waits for no one. Well — except right now.</p>
+    <button class="btn" id="btnResume">RESUME</button>
+    <button class="btn ghost" id="btnRestart">RESTART STORY</button>
+    <button class="btn ghost" id="btnQuit">QUIT TO TITLE</button>
+    <div class="keys">
+      <div><b>W A S D</b> move / drive &nbsp;·&nbsp; <b>E</b> enter / exit car</div>
+      <div><b>Click</b> shoot &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>Space</b> jump / handbrake</div>
+      <div><b>Shift</b> sprint &nbsp;·&nbsp; <b>M</b> music &nbsp;·&nbsp; <b>C</b> camera</div>
+    </div>
+  </div>
+</div>
+
+<div id="endScreen" class="screen hidden">
+  <div class="card">
+    <h1 id="endTitle" style="font-size:44px">WASTED</h1>
+    <p id="endText">The Vipers got the last laugh. For now.</p>
+    <button class="btn" id="btnRetry">TRY AGAIN</button>
+    <button class="btn ghost" id="btnEndTitle">TITLE SCREEN</button>
+  </div>
+</div>
+
+<div id="status" aria-live="polite"></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
