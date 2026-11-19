@@ -344,6 +344,11 @@ function updateCamera(dt) {
 function step(dt) {
   G.time += dt;
   if (G.mode === 'title') {
+    // Space starts the story too — the title screen previously needed a
+    // button click. Consuming pressed here also drops stale title-screen
+    // key presses instead of letting them fire on the first play step.
+    const pressed = input.takePressed();
+    if (pressed.has('jump')) { startGame('story'); return; }
     updateTraffic(G, dt);
     updatePeds(G, dt);
     G.fx.update(dt);
@@ -387,14 +392,14 @@ function step(dt) {
   if (pressed.has('enter')) {
     if (p.inCar) exitCar();
     else {
-      const car = nearestCar(4.5);
+      const car = nearestCar(6);
       if (car) enterCar(car);
     }
   }
 
   if (p.inCar) {
     p.pos.copy(p.inCar.pos);
-    const events = driveCar(G, p.inCar, input, dt);
+    const events = driveCar(G, p.inCar, input, dt, pressed);
     if (events.hitPed) G.toast('You ran someone over! The cops saw that.');
     audio.setEngine(Math.abs(p.inCar.speed) / p.inCar.maxSpeed, true);
   } else {

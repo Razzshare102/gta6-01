@@ -150,8 +150,11 @@ export function spawnTraffic(G) {
     const heading = horiz ? (side > 0 ? Math.PI / 2 : -Math.PI / 2) : (side > 0 ? 0 : Math.PI);
     makeCar(G, x, z, heading, rng.pick(CAR_COLORS), { kind: 'parked' });
   }
-  // Danny's own starter sedan near the garage.
-  const mine = makeCar(G, G.city.hideout.x + 16, G.city.hideout.z + 10, Math.PI / 2, 0x2e6fc2, { kind: 'parked' });
+  // Danny's own starter sedan near the garage. It sits ON the road
+  // intersection (hideout +18, +18) instead of in the block at (-144,-150):
+  // from there the straight-east lane runs into a building ~60 units out
+  // and a W-only driver wedges against it with no way forward.
+  const mine = makeCar(G, G.city.hideout.x + 18, G.city.hideout.z + 18, Math.PI / 2, 0x2e6fc2, { kind: 'parked' });
   mine.mine = true;
 }
 
@@ -275,18 +278,29 @@ export function updatePolice(G, dt) {
  * Arcade driving for the player's car. Returns events for the caller:
  * { crashed, hitPed }.
  */
-export function driveCar(G, car, input, dt) {
+export function driveCar(G, car, input, dt, pressed) {
   const axis = input.axis();
   const events = { crashed: false, hitPed: false };
   const forward = axis.z < 0;
   const back = axis.z > 0;
   const handbrake = input.has('jump');
+  // A fresh W press always gives a small launch impulse, even if the press
+  // is shorter than one frame: `pressed` carries the keydown edge that the
+  // held-keys set would otherwise miss entirely. Without this, tap-only
+  // driving barely moves the car. Mashing stays slower than holding W
+  // (each press nets ~+1.7 after coast-down, vs +16/s held).
+  if (pressed && pressed.has('up')) car.speed = Math.min(car.speed + 2.5, car.maxSpeed);
   if (forward) car.speed += 16 * dt;
   if (back) {
     if (car.speed > 0.5) car.speed -= 26 * dt; // brake
     else car.speed -= 9 * dt; // reverse
   }
-  if (!forward && !back) car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 8 * dt);
+  if (!forward && !back) {
+    // Gentler coast-down at crawl speed so tap-gained speed is not bled
+    // away in a couple of frames; full friction above 5.
+    const coast = Math.abs(car.speed) < 5 ? 4 : 8;
+    car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), coast * dt);
+  }
   if (handbrake) {
     car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 22 * dt);
   }
