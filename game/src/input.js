@@ -6,6 +6,7 @@ export function createInput(canvas) {
   const pressed = new Set(); // edge-triggered: consumed by takePressed()
   let mouseDX = 0, mouseDY = 0;
   let mouseDown = false;
+  let pressFires = false; // this press began while pointer-locked: it may shoot
   let clickCount = 0; // edge-triggered clicks: a fast click must never fall between frames
   let dragging = false;
   let lastX = 0, lastY = 0;
@@ -40,18 +41,23 @@ export function createInput(canvas) {
     const action = KEYMAP[e.code];
     if (action) keys.delete(action);
   });
-  window.addEventListener('blur', () => { keys.clear(); mouseDown = false; dragging = false; });
+  window.addEventListener('blur', () => { keys.clear(); mouseDown = false; pressFires = false; dragging = false; });
 
   canvas.addEventListener('mousedown', (e) => {
     mouseDown = true;
-    clickCount += 1;
+    // Only a press that starts while the pointer is already locked can
+    // shoot. The press that grabs the mouse (or starts a drag-look) used
+    // to count as a shot too, so merely rotating the camera fired the
+    // pistol — once per click, and repeatedly while held via hold-to-fire.
+    pressFires = locked;
+    if (pressFires) clickCount += 1;
     dragging = true;
     lastX = e.clientX; lastY = e.clientY;
-    if (document.pointerLockElement !== canvas) {
+    if (!locked) {
       try { canvas.requestPointerLock(); } catch { /* drag-look still works */ }
     }
   });
-  window.addEventListener('mouseup', () => { mouseDown = false; dragging = false; });
+  window.addEventListener('mouseup', () => { mouseDown = false; dragging = false; pressFires = false; });
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
   });
@@ -71,6 +77,8 @@ export function createInput(canvas) {
     keys,
     get locked() { return locked; },
     get mouseDown() { return mouseDown; },
+    /** True while a shot-capable press is held: hold-to-fire uses this. */
+    get fireDown() { return mouseDown && pressFires; },
     axis() {
       let x = 0, z = 0;
       if (keys.has('up')) z -= 1;

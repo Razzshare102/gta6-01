@@ -349,12 +349,14 @@ function step(dt) {
     // key presses instead of letting them fire on the first play step.
     const pressed = input.takePressed();
     if (pressed.has('jump')) { startGame('story'); return; }
+    input.takeClicks(); // drop clicks made on the title screen: they must
+    // never fire a shot on the first play step
     updateTraffic(G, dt);
     updatePeds(G, dt);
     G.fx.update(dt);
     return;
   }
-  if (G.mode !== 'play') return;
+  if (G.mode !== 'play') { input.takeClicks(); return; }
 
   const pressed = input.takePressed();
   const look = input.takeLook();
@@ -381,8 +383,11 @@ function step(dt) {
   // frames) plus hold-to-fire at a steady rate.
   const clicks = input.takeClicks();
   if (!p.inCar) {
-    if (clicks > 0) shoot(G);
-    else if (input.mouseDown) {
+    // Edge click: exactly one shot. Reset fireT so the same press can't
+    // also fire at once through hold-to-fire on the next step if the
+    // press straddles a frame boundary (that double-fired a quick click).
+    if (clicks > 0) { shoot(G); G.fireT = 0.24; }
+    else if (input.fireDown) { // hold-to-fire: only a locked press may shoot
       G.fireT -= dt;
       if (G.fireT <= 0) { shoot(G); G.fireT = 0.24; }
     } else G.fireT = 0;

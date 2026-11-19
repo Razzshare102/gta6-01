@@ -228,6 +228,11 @@ export function damageEnemy(G, enemy, amount) {
 }
 
 /** Hitscan pistol shot from the camera through the crosshair. */
+// One star of heat at most every 2 s of game time, so a burst of shots
+// doesn't jump straight to five stars. Module-level because shoot() is
+// called with G, and G.time resets to 0 on a new run (guarded below).
+let lastShotHeatAt = -999;
+
 export function shoot(G) {
   const p = G.player;
   if (p.reloading || p.reloadT > 0) return;
@@ -286,9 +291,16 @@ export function shoot(G) {
     }
   }
   G.spawnTracer(origin.x, origin.y, origin.z, end.x, end.y, end.z, 0xffe9a8);
-  // A loud shot near police is a crime.
-  if (G.wanted.level > 0) G.addCrime('shooting', 0);
-  else if (G.nearestCopDist() < 45) G.addCrime('shooting', 1);
+  // A loud pistol shot on a public street is a crime — witnesses hear it.
+  // One star per shot, at most one star every 2 s, so a single burst
+  // doesn't jump straight to five stars. Before this fix a shot only
+  // counted when a cop was already near, so firing on an empty street
+  // left wanted at 0 forever and no police ever came.
+  if (lastShotHeatAt > G.time) lastShotHeatAt = -999; // new run: the clock reset
+  if (G.time - lastShotHeatAt >= 2) {
+    lastShotHeatAt = G.time;
+    G.addCrime('shooting', 1);
+  }
   if (p.ammo === 0) startReload(G);
 }
 
